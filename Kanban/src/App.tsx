@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import './index.css'
+import React, { useState, useEffect } from "react";
+import "./index.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 type Task = {
@@ -7,7 +7,7 @@ type Task = {
   title: string;
   description: string;
   createdAt: string;
-  updatedAt: string; // Campo para armazenar a data de última atualização
+  updatedAt: string;
   isEditing: boolean;
 };
 
@@ -29,12 +29,27 @@ const App: React.FC = () => {
 
   const userName = "Steffany Barbosa";
 
+  // Função para buscar as tarefas da API
+  const fetchTasks = async () => {
+    const response = await fetch("http://localhost:5000/tasks");
+    const data = await response.json();
+    const updatedColumns = [...initialColumns];
+    data.forEach((task: Task) => {
+      updatedColumns[0].tasks.push(task); // Adiciona na coluna "A Fazer"
+    });
+    setColumns(updatedColumns);
+  };
+
+  useEffect(() => {
+    fetchTasks(); // Carrega as tarefas ao iniciar
+  }, []);
+
   const getCurrentDateTime = (): string => {
     const now = new Date();
     return now.toLocaleString();
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (newTask.trim() === "") return;
 
     const newTaskObj: Task = {
@@ -42,10 +57,18 @@ const App: React.FC = () => {
       title: newTask,
       description: newDescription,
       createdAt: getCurrentDateTime(),
-      updatedAt: getCurrentDateTime(), // Data de criação também é a data inicial de atualização
+      updatedAt: getCurrentDateTime(),
       isEditing: false,
     };
 
+    // Enviar tarefa para o servidor
+    await fetch("http://localhost:5000/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newTaskObj),
+    });
+
+    // Atualizar estado local para refletir a nova tarefa
     setColumns((prevColumns) =>
       prevColumns.map((col) =>
         col.name === "A Fazer"
@@ -55,7 +78,7 @@ const App: React.FC = () => {
     );
 
     setNewTask("");
-    setNewDescription(""); // Limpar campos após adicionar
+    setNewDescription("");
   };
 
   const startEditingTask = (taskId: string, columnName: string) => {
@@ -65,9 +88,7 @@ const App: React.FC = () => {
           ? {
               ...col,
               tasks: col.tasks.map((task) =>
-                task.id === taskId
-                  ? { ...task, isEditing: true } // Ativa o modo de edição
-                  : task
+                task.id === taskId ? { ...task, isEditing: true } : task
               ),
             }
           : col
@@ -75,8 +96,13 @@ const App: React.FC = () => {
     );
   };
 
+  const deleteTask = async (taskId: string, columnName: string) => {
+    // Deletar tarefa da API
+    await fetch(`http://localhost:5000/tasks/${taskId}`, {
+      method: "DELETE",
+    });
 
-  const deleteTask = (taskId: string, columnName: string) => {
+    // Atualizar o estado local
     setColumns((prevColumns) =>
       prevColumns.map((col) =>
         col.name === columnName
@@ -87,6 +113,46 @@ const App: React.FC = () => {
           : col
       )
     );
+  };
+
+  const updateTask = async (
+    taskId: string,
+    updatedTask: Task,
+    columnName: string
+  ) => {
+    // Atualizar tarefa na API
+    await fetch(`http://localhost:5000/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedTask),
+    });
+
+    // Atualizar estado local
+    setColumns((prevColumns) =>
+      prevColumns.map((col) =>
+        col.name === columnName
+          ? {
+              ...col,
+              tasks: col.tasks.map((task) =>
+                task.id === taskId ? updatedTask : task
+              ),
+            }
+          : col
+      )
+    );
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, toColumnName: string) => {
+    const taskId = e.dataTransfer.getData("taskId");
+    const fromColumn = e.dataTransfer.getData("fromColumn");
+
+    if (taskId && fromColumn !== toColumnName) {
+      moveTask(taskId, fromColumn, toColumnName);
+    }
   };
 
   const moveTask = (
@@ -115,19 +181,6 @@ const App: React.FC = () => {
 
       return updatedColumns;
     });
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, toColumnName: string) => {
-    const taskId = e.dataTransfer.getData("taskId");
-    const fromColumn = e.dataTransfer.getData("fromColumn");
-
-    if (taskId && fromColumn !== toColumnName) {
-      moveTask(taskId, fromColumn, toColumnName);
-    }
   };
 
   const handleDragStart = (
@@ -196,7 +249,10 @@ const App: React.FC = () => {
 
                   {column.name === "A Fazer" && (
                     <div className="d-flex justify-content-end">
-                      <button className="btn btn-primary mb-3 ms-auto" onClick={addTask}>
+                      <button
+                        className="btn btn-primary mb-3 ms-auto"
+                        onClick={addTask}
+                      >
                         Adicionar
                       </button>
                     </div>
@@ -218,15 +274,32 @@ const App: React.FC = () => {
                               type="text"
                               className="form-control mb-2"
                               defaultValue={task.title}
-                              onChange={(e) => task.title = e.target.value}
+                              onChange={(e) => (task.title = e.target.value)}
                               autoFocus
                             />
                             <textarea
                               className="form-control"
                               defaultValue={task.description}
-                              onChange={(e) => task.description = e.target.value}
+                              onChange={(e) =>
+                                (task.description = e.target.value)
+                              }
                               autoFocus
                             />
+                            <button
+                              className="btn btn-success btn-sm mt-2"
+                              onClick={() => {
+                                const updatedTask = {
+                                  ...task,
+                                  title: task.title,
+                                  description: task.description,
+                                  updatedAt: getCurrentDateTime(), // Atualiza a data de modificação
+                                  isEditing: false,
+                                };
+                                updateTask(task.id, updatedTask, column.name); // Chama a função updateTask
+                              }}
+                            >
+                              Salvar
+                            </button>
                           </div>
                         ) : (
                           <>
@@ -236,16 +309,25 @@ const App: React.FC = () => {
                                 {task.updatedAt}
                               </small>
                             </div>
-                            <p className="text-muted mt-2">{task.description}</p>
+                            <p className="text-muted mt-2">
+                              {task.description}
+                            </p>
                           </>
                         )}
 
                         <div className="d-flex justify-content-end mt-2">
                           <button
                             className="btn btn-sm btn-warning me-2"
-                            onClick={() => startEditingTask(task.id, column.name)}
+                            onClick={() =>
+                              startEditingTask(task.id, column.name)
+                            }
                           >
-                            <img width="24" height="24" src="https://img.icons8.com/material-sharp/24/edit--v1.png" alt="edit--v1"/>
+                            <img
+                              width="24"
+                              height="24"
+                              src="https://img.icons8.com/material-sharp/24/edit--v1.png"
+                              alt="edit--v1"
+                            />
                           </button>
                           <button
                             className="btn btn-sm btn-danger"
