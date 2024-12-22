@@ -31,7 +31,7 @@ const App: React.FC = () => {
 
   // Função para buscar as tarefas da API
   const fetchTasks = async () => {
-    const response = await fetch("http://localhost:5000/tasks");
+    const response = await fetch("http://localhost:3000/tasks");
     const data = await response.json();
     const updatedColumns = [...initialColumns];
     data.forEach((task: Task) => {
@@ -62,7 +62,7 @@ const App: React.FC = () => {
     };
 
     // Enviar tarefa para o servidor
-    await fetch("http://localhost:5000/tasks", {
+    await fetch("http://localhost:3000/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTaskObj),
@@ -98,7 +98,7 @@ const App: React.FC = () => {
 
   const deleteTask = async (taskId: string, columnName: string) => {
     // Deletar tarefa da API
-    await fetch(`http://localhost:5000/tasks/${taskId}`, {
+    await fetch(`http://localhost:3000/tasks/${taskId}`, {
       method: "DELETE",
     });
 
@@ -121,7 +121,7 @@ const App: React.FC = () => {
     columnName: string
   ) => {
     // Atualizar tarefa na API
-    await fetch(`http://localhost:5000/tasks/${taskId}`, {
+    await fetch(`http://localhost:3000/tasks/${taskId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedTask),
